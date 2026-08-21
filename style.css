@@ -68,8 +68,8 @@ nav a {
 
 
 .thumb-img {
-  width: 160px;
-  height: 160px;
+  width: 18rem;
+  aspect-ratio: 1/1;
   object-fit: contain;
   background-color: #5a5a5a;
 }
