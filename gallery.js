@@ -152,21 +152,27 @@ async function downloadCharacterPackage(char) {
       zip.file(targetSlotFileName || 'slot_4.json', slotText);
     }
 
-    // C. ONLY generate custom_assets.json if user has SYNCED
-    if (isSynced) {
-      let remoteCustomAssets = {};
-      if (char.custom_assets_url) {
-        try {
-          const caRes = await fetch(char.custom_assets_url);
-          remoteCustomAssets = await caRes.json();
-        } catch (e) {
-          console.warn('Failed to fetch remote custom_assets.json', e);
+    // C. Always include remote custom asset metadata, but only merge local metadata when synced
+    let remoteCustomAssets = {};
+    if (char.custom_assets_url) {
+      try {
+        const caRes = await fetch(char.custom_assets_url);
+        const parsedCustomAssets = await caRes.json();
+        if (parsedCustomAssets && typeof parsedCustomAssets === 'object' && !Array.isArray(parsedCustomAssets)) {
+          remoteCustomAssets = parsedCustomAssets;
         }
+      } catch (e) {
+        console.warn('Failed to fetch remote custom_assets.json', e);
       }
-
-      const mergedCustomAssets = { ...localCustomAssets, ...remoteCustomAssets };
-      zip.file('custom_assets.json', JSON.stringify(mergedCustomAssets, null, 2));
     }
+
+    const customAssets = isSynced
+      ? { ...localCustomAssets, ...remoteCustomAssets }
+      : {
+          _note: 'These assets are not installed automatically. Copy the numbered entries below into the bottom of your game custom_assets.json, changing their numbers to the next available numbers in that file.',
+          ...Object.fromEntries(Object.entries(remoteCustomAssets).filter(([, value]) => value != null))
+        };
+    zip.file('custom_assets.json', JSON.stringify(customAssets, null, 2));
 
     // D. Fetch raw custom asset files from Supabase storage
     const assetIds = char.asset_ids || [];
@@ -195,7 +201,8 @@ async function downloadCharacterPackage(char) {
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     const downloadLink = document.createElement('a');
     downloadLink.href = URL.createObjectURL(zipBlob);
-    downloadLink.download = `${(char.slot_name || 'Character').replace(/[^a-z0-9]/gi, '_')}_(${targetSlotFileName}).zip`;
+    const slotSuffix = targetSlotFileName ? `_(${targetSlotFileName})` : '';
+    downloadLink.download = `${(char.slot_name || 'Character').replace(/[^a-z0-9]/gi, '_')}${slotSuffix}.zip`;
     downloadLink.click();
     URL.revokeObjectURL(downloadLink.href);
 

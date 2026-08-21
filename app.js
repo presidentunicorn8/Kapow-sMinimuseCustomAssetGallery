@@ -149,21 +149,36 @@ uploadBtn.addEventListener('click', async () => {
 
     items.forEach(item => {
       if (item.prefix && item.prefix.includes('user://custom_assets/')) {
-        const folderID = item.prefix.replace('user://custom_assets/', '').replace('/asset', '');
-        if (folderID) referencedAssetIDs.add(folderID);
+        const folderMatch = item.prefix.match(/^user:\/\/custom_assets\/([^/]+)\/asset/);
+        if (folderMatch) referencedAssetIDs.add(folderMatch[1]);
       }
       if (item.custom_asset_id) {
         referencedAssetIDs.add(item.custom_asset_id);
       }
     });
 
+    log(`Found ${referencedAssetIDs.size} referenced custom asset(s) in ${selectedSlot}.`);
+
     // D. Filter & Upload custom_assets.json Metadata
     const filteredCustomAssets = {};
-    referencedAssetIDs.forEach(assetID => {
-      if (existingCustomAssets[assetID]) {
-        filteredCustomAssets[assetID] = existingCustomAssets[assetID];
+    const customAssetsById = new Map();
+    Object.values(existingCustomAssets).forEach(asset => {
+      const assetID = typeof asset === 'object' && asset !== null ? asset.id : null;
+      if (assetID && referencedAssetIDs.has(assetID)) {
+        customAssetsById.set(assetID, asset);
       }
     });
+
+    let filteredAssetIndex = 0;
+    Array.from(referencedAssetIDs).forEach(assetID => {
+      const asset = customAssetsById.get(assetID);
+      if (asset) {
+        filteredCustomAssets[String(filteredAssetIndex)] = asset;
+        filteredAssetIndex += 1;
+      }
+    });
+
+    log(`Filtered custom_assets.json to ${Object.keys(filteredCustomAssets).length} matching asset record(s).`);
 
     const filteredJsonBlob = new Blob([JSON.stringify(filteredCustomAssets, null, 2)], { type: 'application/json' });
     const customAssetsPath = `uploads/${uploadBatchId}/custom_assets.json`;
@@ -208,8 +223,8 @@ uploadBtn.addEventListener('click', async () => {
       log(`Database Error: ${dbError.message}`);
       alert(`Upload rejected by database: ${dbError.message}`);
     } else {
-      log(`🎉 Successfully published "${characterProfileName}" (${slotFileId})!`);
-      alert(`🎉 Successfully published "${characterProfileName}"!`);
+      log(`♡ Successfully published "${characterProfileName}" (${slotFileId})! ♡`);
+      alert(`♡ Successfully published "${characterProfileName}"! ♡`);
     }
 
   } catch (err) {
