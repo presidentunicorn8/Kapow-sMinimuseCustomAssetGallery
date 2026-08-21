@@ -135,7 +135,7 @@ async function downloadCharacterPackage(char) {
   try {
     const zip = new JSZip();
 
-    let targetSlotFileName = 'slot_4.json'; 
+    let targetSlotFileName = null;
 
     if (isSynced && availableSlotsQueue.length > 0) {
       const assignedSlot = availableSlotsQueue.shift();
@@ -145,10 +145,12 @@ async function downloadCharacterPackage(char) {
       folderStatus.textContent = `Synced. Next empty character slot: ${nextUp} (${availableSlotsQueue.length} empty slots remaining).`;
     }
 
-    // B. Fetch character JSON content and place in assigned slot file
-    const slotRes = await fetch(char.slot_url);
-    const slotText = await slotRes.text();
-    zip.file(targetSlotFileName, slotText);
+    // B. Only include the character slot JSON when the user has synced
+    if (isSynced) {
+      const slotRes = await fetch(char.slot_url);
+      const slotText = await slotRes.text();
+      zip.file(targetSlotFileName || 'slot_4.json', slotText);
+    }
 
     // C. ONLY generate custom_assets.json if user has SYNCED
     if (isSynced) {
