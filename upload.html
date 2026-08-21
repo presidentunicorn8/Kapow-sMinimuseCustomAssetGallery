@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniMuse Character Uploader</title>
+  <link rel="stylesheet" href="style.css?v=2" />
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="upload-page">
+
+  <nav>
+    <a href="index.html" class="right-aligned-link">Back Home</a>
+  </nav>
+
+  <div class="container">
+    <h1>MiniMuse Character Uploader</h1>
+
+    <p>You can contribute custom items to this public open-source database if you want. Create a character that is wearing all the custom items you want to upload, make sure you set the character's name in minimuse, and write down it's slot number.
+    </p>
+    <!-- Step 1: Select MiniMuse Folder -->
+    <div class="card">
+      <h3>Step 1: sync with local data folder</h3>
+
+      <div class="indended-div">
+         paste this path into the file dialogue popup based on if you're windows, android or linux. 
+        <p>windows: <b>%APPDATA%\Godot\app_userdata\MiniMuse</b></br>
+        android: idk but somewhere in <B>Internal Storage/Android/</B></br>
+        linux: idk
+       </div>
+      <label for="folderInput" class="btn">📂 Click to Load MiniMuse Folder</label>
+      <input type="file" id="folderInput" webkitdirectory directory class="hidden" />
+      <p id="folderStatus" class="status-text" role="status">No folder loaded.</p>
+    
+
+    <!-- Step 2: Choose Slot & Push to Supabase -->
+    <div>
+      <p></p>
+    <label for="passphraseInput">
+      What type of game is Minimuse? MiniMuse is a _ _ _ _ _ game. 
+      Enter the 5 letter passcode:
+    </label>
+    <input 
+      type="text" 
+      id="passphraseInput" 
+      placeholder="Enter the 5 letter passcode:" 
+      required 
+    />
+    </div>
+      <h3>Step 2: Choose Slot & Publish</h3>
+      <div class="field-group">
+        <label for="slotSelect">Select Character Slot:</label>
+        <select id="slotSelect"></select>
+      </div>
+              <!-- Optional Custom Artwork File Input -->
+    <label for="customThumbInput">
+      (OPTIONAL) upload a sceenshot of what your custom character looks like:
+    </label>
+    <input 
+      type="file" 
+      id="customThumbInput" 
+      accept="image/png, image/jpeg"
+    />
+    <p></p>
+      <button id="uploadBtn">☁️ Upload Character and the custom items</button>
+      
+      <div id="logContainer" class="hidden">
+        <label>Upload Progress:</label>
+        <div id="uploadLog" class="log-box"></div>
+      </div>
+
+  </div>
+  </div>
+    </div>
+  </div>
+
+  <p class="project-footer">This project is unofficial and has nothing to do with minimuse. This is an open-source public project by kapow. <a href="https://github.com/presidentunicorn8/MinimuseCharacterDuplicator" class="source-link">Source Code</a></p>
+  <script type="module" src="app.js?v=2"></script>
+</body>
+</html>

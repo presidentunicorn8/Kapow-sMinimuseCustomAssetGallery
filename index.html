@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kapow's Minimuse Gallery</title>
+  <link rel="stylesheet" href="style.css?v=2" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+  <header>
+    <nav>
+      <a href="upload.html" class="right-aligned-link">Upload Character</a>
+    </nav>
+    <h1>Kapow's Minimuse Gallery</h1>
+  </header>
+
+  <div class="container">
+    <!-- Character Grid -->
+    <div id="characterGrid" class="grid">
+      <p>Loading characters from database...</p>
+    </div>
+  </div>
+
+  <!-- File Sync Area -->
+      <div class="folder-banner">
+    <div>
+      <h3>How to make downloads sync with your existing game data</h3>
+      <p>by providing your local minimuse data, you can import items and characters without manually uploading each layer of each custom image.
+      </p>
+    </div>
+    <label for="folderInput" class="btn">📂 Click to Sync Local Game Data</label>
+    <input type="file" id="folderInput" webkitdirectory directory class="hidden" />      
+  </div>
+  <div class="indended-div">
+  <p id="folderStatus" class="status-text" role="status">No local folder selected.</p>
+  </div>
+  <div class="indended-div">
+     <h2>Easy Download Option</h2>
+     1. Click the "Sync Local Game Data" button and paste the path based on if you are windows linux or android. </br>
+     2. Download the item you want. </br>
+     3. Extract the zip file from your Downloads folder back into that game folder. Replace existing files with the new</br>
+     4. If you skip these steps you can also download and import the assets layer by layer but its just a bit time-consuming.
+         <h3>Where is your game data?</h3>
+         paste this path into the file dialogue popup. and extract to here once downloaded. 
+        <p>windows: <b>%APPDATA%\Godot\app_userdata\MiniMuse </b></br>
+        android: idk but somewhere in <B>Internal Storage/Android/</B></br>
+        linux: idk
+       </div>
+    </div>
+
+  <p class="project-footer">This project is unofficial and has nothing to do with minimuse. This is an open-source public project by kapow. <a href="https://github.com/presidentunicorn8/MinimuseCharacterDuplicator" class="source-link">Source Code</a></p>
+  <script type="module" src="gallery.js?v=6"></script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+body {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem;
+  background-color: #eafeff;
+}
+
+h1 {
+    color: #e4629f;
+}
+header {
+  margin-bottom: 2rem;
+}
+
+nav a {
+  margin-right: 1rem;
+}
+
+.right-aligned-link {
+  float: right;
+}
+.project-footer{
+  color: gray;
+}
+
+.folder-banner,
+.card {
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+.folder-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+#characterGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.btn{
+    background-color: #efaccb;
+    font-weight: bold;
+    text-align: center;
+    display:flex;
+    align-items:center;
+}
+
+.list-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.thumbnail-pair {
+  display: flex;
+  gap: 1rem;
+}
+
+.thumb-box {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+
+
+.thumb-img {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  background-color: #5a5a5a;
+}
+
+.card-details {
+  flex: 1;
+}
+
+.card-title {
+  margin-top: 0;
+}
+
+.upload-page .container {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.field-group {
+  margin-bottom: 1rem;
+}
+
+.status-text {
+  display: block;
+  margin: 1rem 0 0;
+  padding: 0.5rem;
+  border: 1px solid currentColor;
+  min-height: 1.25rem;
+  font-weight: bold;
+}
+
+.status-text.synced {
+  border-color: rgb(50, 255, 50);
+}
+
+select,
+#passphraseInput,
+#customThumbInput {
+  max-width: 100%;
+}
+
+.file-select-btn,
+#uploadBtn {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.log-box {
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.hidden {
+  display: none;
+}
+
+.indended-div {
+  padding-left: 1rem;
+}
+
+@media (max-width: 640px) {
+  .folder-banner,
+  .list-card {
+    display: block;
+  }
+
+  .thumbnail-pair {
+    margin-bottom: 1rem;
+  }
+
+  .download-btn,
+  #uploadBtn,
+  .file-select-btn {
+    width: 100%;
+  }
+
+}
