@@ -17,7 +17,7 @@
   <div class="container">
     <h1>MiniMuse Character Uploader</h1>
 
-    <p>You can contribute custom items to this public open-source database if you want. Create a character that is wearing all the custom items you want to upload, make sure you set the character's name in minimuse, and write down it's slot number.
+    <p>You can contribute custom items to this public open-source database if you want. Create a wardrobe entry that is wearing all the custom items you want to upload, then give the wardrobe item a recognizable name in MiniMuse.
     </p>
     <!-- Step 1: Select MiniMuse Folder -->
     <div class="card">
@@ -34,7 +34,7 @@
       <p id="folderStatus" class="status-text" role="status">No folder loaded.</p>
     
 
-    <!-- Step 2: Choose Slot & Push to Supabase -->
+    <!-- Step 2: Choose Wardrobe Item & Push to Supabase -->
     <div>
       <p></p>
     <label for="passphraseInput">
@@ -48,10 +48,10 @@
       required 
     />
     </div>
-      <h3>Step 2: Choose Slot & Publish</h3>
+      <h3>Step 2: Choose Wardrobe Item & Publish</h3>
       <div class="field-group">
-        <label for="slotSelect">Select Character Slot:</label>
-        <select id="slotSelect"></select>
+        <label for="wardrobeSelect">Which wardrobe item do you want to upload?</label>
+        <select id="wardrobeSelect"></select>
       </div>
               <!-- Optional Custom Artwork File Input -->
     <label for="customThumbInput">

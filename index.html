@@ -16,7 +16,7 @@
     </nav>
     <h1>Kapow's Minimuse Gallery</h1>
   </header>
-
+  <p>Outfits may take 2-3 minutes to download when there are 10+ items. Be patient!</p>
   <div class="container">
     <!-- Character Grid -->
     <div id="characterGrid" class="grid">
@@ -25,11 +25,11 @@
   </div>
 
   <!-- File Sync Area -->
-  <div class="hidden">
+  <div>
       <div class="folder-banner">
     <div>
-      <h3>How to make downloads sync with your existing game data</h3>
-      <p>by providing your local minimuse data, you can import items and characters without manually uploading each layer of each custom image.
+      <h3>Optional: sync with your existing game data</h3>
+      <p>Provide your local MiniMuse data folder to merge downloaded wardrobe items and custom assets into your existing files. Without syncing, the ZIP contains only the downloaded item and its assets for manual editing.
       </p>
     </div>
     <label for="folderInput" class="btn">📂 Click to Sync Local Game Data</label>
@@ -39,20 +39,19 @@
   <p id="folderStatus" class="status-text" role="status">No local folder selected.</p>
   </div>
   <div class="indended-div">
-     <h2>Easy Download Option</h2>
-     1. Click the "Sync Local Game Data" button and paste the path based on if you are windows linux or android. </br>
+    <h2>Easy Download Option</h2>
+    1. Optional: click the "Sync Local Game Data" button and paste the path based on if you are windows linux or android. </br>
         <blockquote>
         <p>windows: <b>%APPDATA%\Godot\app_userdata\MiniMuse </b></br>
         android: idk but somewhere in <B>Internal Storage/Android/</B></br>
         linux: idk
         </blockquote>
-     2. Download the item you want. </br>
-     3. Extract the zip file from your Downloads folder back into that game folder. Replace existing files with the new</br>
-     4. If you skip these steps you can also download and import the assets layer by layer but its just a bit time-consuming.
+    2. Download the wardrobe item you want. </br>
+    3. Extract the zip file from your Downloads folder. Replace `wardrobe.json` and `custom_assets.json` in your MiniMuse folder, then copy the new `custom_assets` folders into the existing `custom_assets` folder.</br>
        </div>
     </div>
   </div>
   <p class="project-footer">This project is unofficial and I am not on the minimuse team. This is an open-source publically shared gallery project by kapow. <a href="https://github.com/presidentunicorn8/Kapow-sMinimuseCustomAssetGallery" class="source-link">Source Code</a></p>
-  <script type="module" src="gallery.js?v=6"></script>
+  <script type="module" src="gallery.js?v=7"></script>
 </body>
 </html>

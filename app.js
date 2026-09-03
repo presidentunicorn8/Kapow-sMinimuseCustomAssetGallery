@@ -10,13 +10,14 @@ const BUCKET_NAME = 'minimuse-uploads';
 const folderInput = document.getElementById('folderInput');
 const folderStatus = document.getElementById('folderStatus');
 const uploadCard = document.getElementById('uploadCard');
-const slotSelect = document.getElementById('slotSelect');
+const wardrobeSelect = document.getElementById('wardrobeSelect');
 const uploadBtn = document.getElementById('uploadBtn');
 const logContainer = document.getElementById('logContainer');
 const uploadLog = document.getElementById('uploadLog');
 
 let localFilesMap = new Map();
 let existingCustomAssets = {};
+let wardrobeEntries = [];
 
 function log(msg) {
   logContainer.classList.remove('hidden');
@@ -32,20 +33,32 @@ folderInput.addEventListener('change', async (event) => {
   if (files.length === 0) return;
 
   localFilesMap.clear();
-  slotSelect.innerHTML = '';
-  const foundSlots = [];
+  wardrobeSelect.innerHTML = '';
+  wardrobeEntries = [];
 
   for (const file of files) {
     const relativePath = file.webkitRelativePath.split('/').slice(1).join('/');
     localFilesMap.set(relativePath, file);
 
-    // Match slot files
-    if (file.name.startsWith('slot_') && file.name.endsWith('.json')) {
-      const slotNumMatch = file.name.match(/^slot_(\d+)\.json$/i);
-      if (slotNumMatch) {
-        foundSlots.push(file.name);
-      }
+  }
+
+  if (!localFilesMap.has('wardrobe.json')) {
+    folderStatus.textContent = 'ERROR: wardrobe.json was not found in the selected MiniMuse folder.';
+    return;
+  }
+
+  try {
+    const wardrobeText = await localFilesMap.get('wardrobe.json').text();
+    const parsedWardrobe = JSON.parse(wardrobeText || '[]');
+    if (!Array.isArray(parsedWardrobe)) {
+      throw new Error('wardrobe.json must contain an array of wardrobe entries.');
     }
+    wardrobeEntries = parsedWardrobe.filter(entry =>
+      entry && typeof entry === 'object' && Array.isArray(entry.items)
+    );
+  } catch (e) {
+    folderStatus.textContent = `ERROR: Could not parse wardrobe.json: ${e.message}`;
+    return;
   }
 
   // Parse existing custom_assets.json
@@ -59,34 +72,28 @@ folderInput.addEventListener('change', async (event) => {
   }
 
   folderStatus.textContent = `Loaded MiniMuse folder (${files.length} total files indexed).`;
-
-  // Sort slots numerically (e.g., slot_1.json, slot_2.json, slot_10.json)
-  foundSlots.sort((a, b) => {
-    const numA = parseInt(a.match(/\d+/)[0], 10);
-    const numB = parseInt(b.match(/\d+/)[0], 10);
-    return numA - numB;
-  });
-
-  // Default to slot_1.json if no slot files exist on disk
-  const availableSlots = foundSlots.length > 0 ? foundSlots : ['slot_1.json'];
-
-  // Populate Slot Selector Dropdown
-  availableSlots.forEach(slotName => {
+  wardrobeEntries.forEach((entry, index) => {
     const opt = document.createElement('option');
-    opt.value = slotName;
-    opt.textContent = slotName;
-    slotSelect.appendChild(opt);
+    const customAssetCount = findCustomAssetIds(entry).length;
+    opt.value = entry.id || String(index);
+    opt.textContent = `${entry.name || 'Unnamed Wardrobe Item'} (${customAssetCount} custom asset folder${customAssetCount === 1 ? '' : 's'})`;
+    wardrobeSelect.appendChild(opt);
   });
 
-  slotSelect.value = availableSlots[0];
+  if (wardrobeEntries.length === 0) {
+    folderStatus.textContent = 'ERROR: No valid wardrobe entries were found in wardrobe.json.';
+    return;
+  }
+
+  wardrobeSelect.value = wardrobeEntries[0].id || '0';
   uploadCard.classList.remove('hidden');
 });
 
 // 2. Upload Process Execution
 uploadBtn.addEventListener('click', async () => {
-  const selectedSlot = slotSelect.value;
+  const selectedWardrobeId = wardrobeSelect.value;
   uploadLog.innerHTML = '';
-  log(`Starting upload sequence for local file: ${selectedSlot}...`);
+  log(`Starting upload sequence for wardrobe item: ${selectedWardrobeId}...`);
 
   // Read Passphrase Input
   const passphraseElem = document.getElementById('passphraseInput');
@@ -98,31 +105,23 @@ uploadBtn.addEventListener('click', async () => {
     return;
   }
 
-  if (!localFilesMap.has(selectedSlot)) {
-    log(`ERROR: Selected file ${selectedSlot} not found on disk.`);
-    return;
-  }
+  const selectedWardrobe = wardrobeEntries.find((entry, index) =>
+    (entry.id || String(index)) === selectedWardrobeId
+  );
 
-  // Read local slot JSON content
-  const slotFile = localFilesMap.get(selectedSlot);
-  const slotText = await slotFile.text();
-  let slotData = {};
-
-  try {
-    slotData = JSON.parse(slotText);
-  } catch (e) {
-    log(`ERROR: Failed to parse JSON in ${selectedSlot}.`);
+  if (!selectedWardrobe) {
+    log(`ERROR: Selected wardrobe item ${selectedWardrobeId} was not found.`);
     return;
   }
 
   // Generate Unique ID & Batch Name
   const uniqueId = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-  const slotFileId = `slot_${uniqueId}.json`;
+  const wardrobeFileId = `wardrobe_${uniqueId}.json`;
   const uploadBatchId = `batch_${uniqueId}`;
-  const characterProfileName = slotData.profile_name || 'Unnamed Character';
+  const characterProfileName = selectedWardrobe.name || 'Unnamed Wardrobe Item';
 
-  log(`Generated Unique File ID: ${slotFileId}`);
-  log(`Character Profile Name: ${characterProfileName}`);
+  log(`Generated wardrobe file ID: ${wardrobeFileId}`);
+  log(`Wardrobe item name: ${characterProfileName}`);
 
   try {
     // A. Upload Custom Creator Thumbnail (Optional User PNG)
@@ -137,15 +136,16 @@ uploadBtn.addEventListener('click', async () => {
       log('Custom creator thumbnail uploaded!');
     }
 
-    // B. Upload Renamed Slot File
-    log(`Uploading ${slotFileId} to storage bucket...`);
-    const slotBlob = new Blob([slotText], { type: 'application/json' });
-    const slotPath = `uploads/${uploadBatchId}/${slotFileId}`;
-    const slotUrl = await uploadFileToSupabase(slotPath, slotBlob, userPassphrase);
+    // B. Upload the selected wardrobe entry
+    log(`Uploading ${wardrobeFileId} to storage bucket...`);
+    const wardrobeText = JSON.stringify(selectedWardrobe, null, 2);
+    const wardrobeBlob = new Blob([wardrobeText], { type: 'application/json' });
+    const wardrobePath = `uploads/${uploadBatchId}/${wardrobeFileId}`;
+    const wardrobeUrl = await uploadFileToSupabase(wardrobePath, wardrobeBlob, userPassphrase);
 
     // C. Collect Referenced Custom Asset IDs
     const referencedAssetIDs = new Set();
-    const items = slotData.items || [];
+    const items = selectedWardrobe.items || [];
 
     items.forEach(item => {
       if (item.prefix && item.prefix.includes('user://custom_assets/')) {
@@ -157,10 +157,13 @@ uploadBtn.addEventListener('click', async () => {
       }
     });
 
-    log(`Found ${referencedAssetIDs.size} referenced custom asset(s) in ${selectedSlot}.`);
+    log(`Found ${referencedAssetIDs.size} referenced custom asset folder(s) in ${characterProfileName}.`);
+    if (referencedAssetIDs.size === 0) {
+      log('This wardrobe item contains no user://custom_assets references, so no custom asset folders will be uploaded.');
+    }
 
     // D. Filter & Upload custom_assets.json Metadata
-    const filteredCustomAssets = {};
+    const filteredCustomAssets = [];
     const customAssetsById = new Map();
     Object.values(existingCustomAssets).forEach(asset => {
       const assetID = typeof asset === 'object' && asset !== null ? asset.id : null;
@@ -169,16 +172,14 @@ uploadBtn.addEventListener('click', async () => {
       }
     });
 
-    let filteredAssetIndex = 0;
     Array.from(referencedAssetIDs).forEach(assetID => {
       const asset = customAssetsById.get(assetID);
       if (asset) {
-        filteredCustomAssets[String(filteredAssetIndex)] = asset;
-        filteredAssetIndex += 1;
+        filteredCustomAssets.push(asset);
       }
     });
 
-    log(`Filtered custom_assets.json to ${Object.keys(filteredCustomAssets).length} matching asset record(s).`);
+    log(`Filtered custom_assets.json to ${filteredCustomAssets.length} matching asset record(s).`);
 
     const filteredJsonBlob = new Blob([JSON.stringify(filteredCustomAssets, null, 2)], { type: 'application/json' });
     const customAssetsPath = `uploads/${uploadBatchId}/custom_assets.json`;
@@ -186,7 +187,7 @@ uploadBtn.addEventListener('click', async () => {
 
     // E. Compile & Upload Single Flattened Preview Thumbnail
     log('Compiling character preview image from custom z-layers...');
-    const previewBlob = await generateCharacterPreview(slotData, localFilesMap);
+    const previewBlob = await generateCharacterPreview(selectedWardrobe, localFilesMap);
 
     let previewImageUrl = null;
     if (previewBlob) {
@@ -196,23 +197,35 @@ uploadBtn.addEventListener('click', async () => {
     }
 
     // F. Upload Raw Custom Asset Files
+    let uploadedAssetFileCount = 0;
     for (const assetID of referencedAssetIDs) {
-      for (const [relativePath, file] of localFilesMap.entries()) {
-        if (relativePath.startsWith(`custom_assets/${assetID}/`)) {
-          log(`Uploading asset file: ${relativePath}...`);
-          const remotePath = `uploads/${uploadBatchId}/${relativePath}`;
-          await uploadFileToSupabase(remotePath, file, userPassphrase);
-        }
+      const assetPathPrefix = `custom_assets/${assetID}/`;
+      const assetFiles = Array.from(localFilesMap.entries()).filter(([relativePath]) =>
+        relativePath.replaceAll('\\', '/').startsWith(assetPathPrefix)
+      );
+
+      if (assetFiles.length === 0) {
+        log(`WARNING: No local files found for custom asset folder ${assetID}.`);
+        continue;
+      }
+
+      for (const [relativePath, file] of assetFiles) {
+        const normalizedPath = relativePath.replaceAll('\\', '/');
+        log(`Uploading asset file: ${normalizedPath}...`);
+        const remotePath = `uploads/${uploadBatchId}/${normalizedPath}`;
+        await uploadFileToSupabase(remotePath, file, userPassphrase);
+        uploadedAssetFileCount += 1;
       }
     }
+    log(`Uploaded ${uploadedAssetFileCount} custom asset file(s) across ${referencedAssetIDs.size} referenced folder(s).`);
 
     // G. Insert Database Record via Passphrase RPC Function
     log('Saving record to Supabase database via secure RPC function...');
     const { data, error: dbError } = await supabaseClient.rpc('upload_character_with_passphrase', {
       p_passphrase: userPassphrase,
       p_slot_name: characterProfileName,
-      p_slot_file_id: slotFileId,
-      p_slot_url: slotUrl,
+      p_slot_file_id: wardrobeFileId,
+      p_slot_url: wardrobeUrl,
       p_preview_image_url: previewImageUrl,
       p_user_thumbnail_url: userThumbnailUrl,
       p_custom_assets_url: customAssetsUrl,
@@ -223,7 +236,7 @@ uploadBtn.addEventListener('click', async () => {
       log(`Database Error: ${dbError.message}`);
       alert(`Upload rejected by database: ${dbError.message}`);
     } else {
-      log(`♡ Successfully published "${characterProfileName}" (${slotFileId})! ♡`);
+      log(`♡ Successfully published "${characterProfileName}" (${wardrobeFileId})! ♡`);
       alert(`♡ Successfully published "${characterProfileName}"! ♡`);
     }
 
@@ -234,14 +247,14 @@ uploadBtn.addEventListener('click', async () => {
 });
 
 // Helper: Canvas Layer Compositor (Excludes thumb.png files)
-async function generateCharacterPreview(slotData, localFilesMap) {
+async function generateCharacterPreview(wardrobeEntry, localFilesMap) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
   canvas.width = 1024;
   canvas.height = 1024;
 
-  const items = slotData.items || [];
+  const items = wardrobeEntry.items || [];
   const customItems = items.filter(item => item.prefix && item.prefix.includes('user://custom_assets/'));
 
   // Sort items by custom_z or z property
@@ -321,6 +334,16 @@ function loadImageFromFile(file) {
     };
     img.src = url;
   });
+}
+
+function findCustomAssetIds(wardrobeEntry) {
+  const assetIds = new Set();
+  (wardrobeEntry.items || []).forEach(item => {
+    if (item.custom_asset_id) assetIds.add(item.custom_asset_id);
+    const match = item.prefix && item.prefix.match(/^user:\/\/custom_assets\/([^/]+)\/asset/);
+    if (match) assetIds.add(match[1]);
+  });
+  return Array.from(assetIds);
 }
 
 // Helper: Storage Upload & Public URL Fetch

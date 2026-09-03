@@ -7,71 +7,51 @@ const folderStatus = document.getElementById('folderStatus');
 const characterGrid = document.getElementById('characterGrid');
 
 let isSynced = false;
-let localCustomAssets = {};
-let availableSlotsQueue = []; // Array of unused slot filenames 
+let localCustomAssets = [];
+let localWardrobe = [];
+let localFilesMap = new Map();
 
-// 1. Read local folder, merge assets, and detect unused slots
+// 1. Read local folder and parse the files that will be merged into downloads
 folderInput.addEventListener('change', async (event) => {
   const files = Array.from(event.target.files);
   if (files.length === 0) return;
 
+  localFilesMap = new Map();
+  for (const file of files) {
+    const relativePath = file.webkitRelativePath.split('/').slice(1).join('/');
+    localFilesMap.set(relativePath, file);
+  }
+
+  const wardrobeFile = localFilesMap.get('wardrobe.json');
+  const customAssetsFile = localFilesMap.get('custom_assets.json');
+  if (!wardrobeFile || !customAssetsFile) {
+    isSynced = false;
+    folderStatus.classList.remove('synced');
+    folderStatus.textContent = 'ERROR: Select a MiniMuse folder containing wardrobe.json and custom_assets.json.';
+    return;
+  }
+
+  try {
+    const wardrobeData = JSON.parse(await wardrobeFile.text() || '[]');
+    const customAssetsData = JSON.parse(await customAssetsFile.text() || '[]');
+    if (!Array.isArray(wardrobeData)) {
+      throw new Error('wardrobe.json must contain an array.');
+    }
+    if (!customAssetsData || typeof customAssetsData !== 'object') {
+      throw new Error('custom_assets.json must contain a JSON array or object.');
+    }
+    localWardrobe = wardrobeData;
+    localCustomAssets = customAssetsData;
+  } catch (e) {
+    isSynced = false;
+    folderStatus.classList.remove('synced');
+    folderStatus.textContent = `ERROR: Could not parse MiniMuse data: ${e.message}`;
+    return;
+  }
+
   isSynced = true;
   folderStatus.classList.add('synced');
-
-  // A. Parse local custom_assets.json if it exists
-  const jsonFile = files.find(f => f.name === 'custom_assets.json');
-  if (jsonFile) {
-    try {
-      const text = await jsonFile.text();
-      localCustomAssets = JSON.parse(text || '{}');
-      console.log('✅ Parsed local custom_assets.json:', Object.keys(localCustomAssets).length, 'entries found.');
-    } catch (e) {
-      console.warn('⚠️ Failed to parse local custom_assets.json', e);
-    }
-  }
-
-  // B. Find unmodified slot files (Filtered to slots >= 4)
-  const slotFiles = files.filter(f => {
-    const match = f.name.match(/^slot_(\d+)\.json$/i);
-    return match && parseInt(match[1], 10) >= 4;
-  });
-
-  if (slotFiles.length > 0) {
-    const timeBuckets = {};
-
-    slotFiles.forEach(f => {
-      // 5-minute bucket window (300,000 ms)
-      const bucket = Math.floor(f.lastModified / 300000);
-      timeBuckets[bucket] = (timeBuckets[bucket] || 0) + 1;
-    });
-
-    // Dominant bucket = initial install batch date
-    const dominantBucket = Object.keys(timeBuckets).reduce((a, b) => 
-      timeBuckets[a] > timeBuckets[b] ? a : b
-    );
-    const unusedSlots = slotFiles.filter(f => 
-      String(Math.floor(f.lastModified / 300000)) === String(dominantBucket)
-    );
-
-    // Sort numerically by slot number (4, 5, 6...)
-    availableSlotsQueue = unusedSlots
-      .map(f => {
-        const match = f.name.match(/\d+/);
-        return {
-          filename: f.name,
-          num: match ? parseInt(match[0], 10) : 0
-        };
-      })
-      .sort((a, b) => a.num - b.num);
-
-    console.log('✅ Target slot identified:', availableSlotsQueue[0]?.filename);
-    console.log(`📦 Unused slots found (${availableSlotsQueue.length}):`, availableSlotsQueue.map(s => s.filename));
-
-    const nextSlot = availableSlotsQueue.length > 0 ? availableSlotsQueue[0].filename : 'slot_4.json';
-    folderStatus.textContent = `Synced with MiniMuse! Next target slot: ${nextSlot} (${availableSlotsQueue.length} empty slots found).`;
-  } else {
-    folderStatus.textContent = 'Synced AppData (no slot files >= 4 detected).';
-  }
+  folderStatus.textContent = `Synced MiniMuse folder. ${localWardrobe.length} wardrobe item(s) and ${getRecordCount(localCustomAssets)} custom asset record(s) loaded.`;
 });
 
 // 2. Load Gallery Cards
@@ -99,6 +79,7 @@ async function loadGallery() {
 
     const gameThumb = char.preview_image_url || 'https://via.placeholder.com/80?text=No+Render';
     const creatorThumb = char.user_thumbnail_url || gameThumb; // Fallback if no custom thumb provided
+    const customAssetCount = Array.isArray(char.asset_ids) ? char.asset_ids.length : 0;
 
     card.innerHTML = `
       <div class="thumbnail-pair">
@@ -112,10 +93,11 @@ async function loadGallery() {
         </div>
       </div>
       <div class="card-details">
-        <span class="thumb-label">Character name</span>
+        <span class="thumb-label">Wardrobe item</span>
         <h3 class="card-title">${char.slot_name || 'Unnamed Character'}</h3>
+        <p class="asset-count">${customAssetCount} custom asset${customAssetCount === 1 ? '' : 's'} included</p>
       </div>
-      <button class="download-btn" id="dl-${char.id || char.slot_file_id}">💾 Download Character</button>
+      <button class="download-btn" id="dl-${char.id || char.slot_file_id}">💾 Download Wardrobe Item</button>
     `;
 
     characterGrid.appendChild(card);
@@ -135,47 +117,44 @@ async function downloadCharacterPackage(char) {
   try {
     const zip = new JSZip();
 
-    let targetSlotFileName = null;
-
-    if (isSynced && availableSlotsQueue.length > 0) {
-      const assignedSlot = availableSlotsQueue.shift();
-      targetSlotFileName = assignedSlot.filename;
-
-      const nextUp = availableSlotsQueue.length > 0 ? availableSlotsQueue[0].filename : 'None';
-      folderStatus.textContent = `Synced. Next empty character slot: ${nextUp} (${availableSlotsQueue.length} empty slots remaining).`;
+    // B. Fetch and append the selected wardrobe entry
+    const wardrobeRes = await fetch(char.slot_url);
+    if (!wardrobeRes.ok) {
+      throw new Error(`Could not fetch wardrobe item: ${wardrobeRes.status}`);
+    }
+    const wardrobePayload = await wardrobeRes.json();
+    const remoteWardrobeEntry = Array.isArray(wardrobePayload) ? wardrobePayload[0] : wardrobePayload;
+    if (!remoteWardrobeEntry || typeof remoteWardrobeEntry !== 'object' || !Array.isArray(remoteWardrobeEntry.items)) {
+      throw new Error('Downloaded wardrobe data is not a valid wardrobe entry.');
     }
 
-    // B. Only include the character slot JSON when the user has synced
-    if (isSynced) {
-      const slotRes = await fetch(char.slot_url);
-      const slotText = await slotRes.text();
-      zip.file(targetSlotFileName || 'slot_4.json', slotText);
-    }
+    const mergedWardrobe = isSynced
+      ? mergeWardrobeEntries(localWardrobe, remoteWardrobeEntry)
+      : [remoteWardrobeEntry];
+    zip.file('wardrobe.json', JSON.stringify(mergedWardrobe, null, 2));
 
-    // C. Always include remote custom asset metadata, but only merge local metadata when synced
-    let remoteCustomAssets = {};
+    // C. Merge remote custom asset metadata into the local index
+    let remoteCustomAssets = [];
     if (char.custom_assets_url) {
-      try {
-        const caRes = await fetch(char.custom_assets_url);
-        const parsedCustomAssets = await caRes.json();
-        if (parsedCustomAssets && typeof parsedCustomAssets === 'object' && !Array.isArray(parsedCustomAssets)) {
-          remoteCustomAssets = parsedCustomAssets;
-        }
-      } catch (e) {
-        console.warn('Failed to fetch remote custom_assets.json', e);
+      const caRes = await fetch(char.custom_assets_url);
+      if (!caRes.ok) {
+        throw new Error(`Could not fetch custom asset metadata: ${caRes.status}`);
+      }
+      const parsedCustomAssets = await caRes.json();
+      if (parsedCustomAssets && typeof parsedCustomAssets === 'object') {
+        remoteCustomAssets = parsedCustomAssets;
+      } else {
+        throw new Error('Downloaded custom asset metadata is not a valid JSON array or object.');
       }
     }
 
-    const customAssets = isSynced
-      ? { ...localCustomAssets, ...remoteCustomAssets }
-      : {
-          _note: 'These assets are not installed automatically. Copy the numbered entries below into the bottom of your game custom_assets.json, changing their numbers to the next available numbers in that file.',
-          ...Object.fromEntries(Object.entries(remoteCustomAssets).filter(([, value]) => value != null))
-        };
-    zip.file('custom_assets.json', JSON.stringify(customAssets, null, 2));
+    const mergedCustomAssets = isSynced
+      ? mergeCustomAssets(localCustomAssets, remoteCustomAssets)
+      : remoteCustomAssets;
+    zip.file('custom_assets.json', JSON.stringify(mergedCustomAssets, null, 2));
 
-    // D. Fetch raw custom asset files from Supabase storage
-    const assetIds = char.asset_ids || [];
+    // D. Fetch raw custom asset files referenced by the wardrobe entry
+    const assetIds = findCustomAssetIds(remoteWardrobeEntry);
     const batchFolder = char.slot_url.split('/uploads/')[1].split('/')[0];
 
     for (const assetId of assetIds) {
@@ -201,8 +180,7 @@ async function downloadCharacterPackage(char) {
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     const downloadLink = document.createElement('a');
     downloadLink.href = URL.createObjectURL(zipBlob);
-    const slotSuffix = targetSlotFileName ? `_(${targetSlotFileName})` : '';
-    downloadLink.download = `${(char.slot_name || 'Character').replace(/[^a-z0-9]/gi, '_')}${slotSuffix}.zip`;
+    downloadLink.download = `${(char.slot_name || 'Wardrobe_Item').replace(/[^a-z0-9]/gi, '_')}_updated.zip`;
     downloadLink.click();
     URL.revokeObjectURL(downloadLink.href);
 
@@ -212,5 +190,72 @@ async function downloadCharacterPackage(char) {
     btn.textContent = originalText;
     btn.disabled = false;
   }
+}
+
+function mergeWardrobeEntries(existingEntries, newEntry) {
+  const entries = Array.isArray(existingEntries) ? [...existingEntries] : [];
+  if (!newEntry.id) {
+    entries.push(newEntry);
+    return entries;
+  }
+
+  const existingIndex = entries.findIndex(entry => entry && entry.id === newEntry.id);
+  if (existingIndex === -1) {
+    entries.push(newEntry);
+  }
+  return entries;
+}
+
+function mergeCustomAssets(existingAssets, newAssets) {
+  const remoteRecords = Array.isArray(newAssets) ? newAssets : Object.values(newAssets || {});
+
+  if (Array.isArray(existingAssets)) {
+    const mergedAssets = [...existingAssets];
+    const existingIds = new Set(
+      mergedAssets
+        .filter(asset => asset && typeof asset === 'object' && asset.id)
+        .map(asset => asset.id)
+    );
+
+    remoteRecords.forEach(asset => {
+      if (!asset || typeof asset !== 'object' || !asset.id || existingIds.has(asset.id)) return;
+      mergedAssets.push(asset);
+      existingIds.add(asset.id);
+    });
+    return mergedAssets;
+  }
+
+  const mergedAssets = { ...(existingAssets || {}) };
+  const existingIds = new Set(
+    Object.values(mergedAssets)
+      .filter(asset => asset && typeof asset === 'object' && asset.id)
+      .map(asset => asset.id)
+  );
+
+  remoteRecords.forEach(asset => {
+    if (!asset || typeof asset !== 'object' || !asset.id || existingIds.has(asset.id)) return;
+
+    const targetKey = Object.prototype.hasOwnProperty.call(mergedAssets, asset.id)
+      ? `custom_asset_${asset.id}`
+      : asset.id;
+    mergedAssets[targetKey] = asset;
+    existingIds.add(asset.id);
+  });
+
+  return mergedAssets;
+}
+
+function getRecordCount(records) {
+  return Array.isArray(records) ? records.length : Object.keys(records || {}).length;
+}
+
+function findCustomAssetIds(wardrobeEntry) {
+  const assetIds = new Set();
+  (wardrobeEntry.items || []).forEach(item => {
+    if (item.custom_asset_id) assetIds.add(item.custom_asset_id);
+    const match = item.prefix && item.prefix.match(/^user:\/\/custom_assets\/([^/]+)\/asset/);
+    if (match) assetIds.add(match[1]);
+  });
+  return Array.from(assetIds);
 }
 loadGallery();
